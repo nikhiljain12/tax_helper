@@ -4,8 +4,9 @@ A Python tool for permanently redacting sensitive information from PDF documents
 
 ## Features
 
-- **Exact String Matching**: Redact specific names, addresses, SSNs, or any custom text
-- **Pattern-Based Detection**: Auto-detect and redact SSNs, phone numbers, and email addresses
+- **Exact String Matching**: Redact specific names, addresses, TINs, or any custom text
+- **Pattern-Based Detection**: Auto-detect and redact TINs (SSN/EIN formats), phone numbers, and email addresses
+- **Smart Format Conversion**: Automatically converts TIN to all SSN and EIN format variants
 - **Permanent Redaction**: Text is completely removed from the PDF, not just visually covered
 - **Case-Insensitive Search**: Optional case-sensitive or case-insensitive matching
 - **Command-Line Interface**: Easy to use CLI with multiple options
@@ -24,14 +25,14 @@ pip install -r requirements.txt
 
 ### Basic Usage
 
-Redact a specific name and SSN:
+Redact a specific name and TIN:
 ```bash
-python main.py -i tax_form.pdf -o redacted.pdf --name "John Doe" --ssn "123-45-6789"
+python main.py -i tax_form.pdf -o redacted.pdf --name "John Doe" --tin "123-45-6789"
 ```
 
 ### Auto-Detect Sensitive Patterns
 
-Automatically find and redact SSNs, phone numbers, and emails:
+Automatically find and redact TINs, phone numbers, and emails:
 ```bash
 python main.py -i document.pdf --auto-detect
 ```
@@ -59,9 +60,9 @@ python main.py -i tax_form.pdf
 | `-o, --output` | Output PDF file path (default: `<input>_redacted.pdf`) |
 | `--name` | Name(s) to redact (can be used multiple times) |
 | `--address` | Address(es) to redact (can be used multiple times) |
-| `--ssn` | SSN(s) to redact (can be used multiple times) |
+| `--tin` | TIN(s) to redact - auto-converts to all SSN/EIN formats (can be used multiple times) |
 | `--custom` | Custom string(s) to redact (can be used multiple times) |
-| `--auto-detect` | Auto-detect SSN, phone, and email patterns |
+| `--auto-detect` | Auto-detect TIN, phone, and email patterns |
 | `--case-sensitive` | Perform case-sensitive matching |
 
 ## Examples
@@ -71,7 +72,8 @@ python main.py -i tax_form.pdf
 python main.py -i tax_return.pdf \
   --name "John Smith" \
   --address "123 Main Street" \
-  --ssn "555-12-3456"
+  --tin "555-12-3456"
+# Note: TIN will be redacted in all formats (SSN dashed, plain, EIN dashed, partially redacted)
 ```
 
 ### Example 2: Redact with Auto-Detection
@@ -84,11 +86,33 @@ python main.py -i document.pdf --auto-detect --name "Confidential Client"
 python main.py -i report.pdf --custom "TOP SECRET" --case-sensitive
 ```
 
+### Example 4: Auto-Detect TIN Formats
+```bash
+python main.py -i business_tax_form.pdf --auto-detect
+# Automatically detects all TIN formats: 123-45-6789, 123456789, xx-xxx-6789,
+#                        XX-XXX-6789, **-***-6789, 12-3456789
+```
+
+### Example 5: Smart TIN Format Conversion
+```bash
+python main.py -i tax_form.pdf --tin "123456789"
+# Automatically redacts all these formats:
+# - 123-45-6789 (SSN dashed)
+# - 123456789 (plain)
+# - 12-3456789 (EIN dashed)
+# - xx-xxx-6789, XX-XXX-6789, **-***-6789 (partially redacted)
+```
+
 ## Pattern Detection
 
 When using `--auto-detect`, the tool searches for:
 
-- **SSN**: Format `XXX-XX-XXXX`
+- **TIN (Tax Identification Number)**: Multiple formats covering both SSN and EIN
+  - SSN dashed: `XXX-XX-XXXX` (e.g., 123-45-6789)
+  - EIN dashed: `XX-XXXXXXX` (e.g., 12-3456789)
+  - Plain digits: `XXXXXXXXX` (e.g., 123456789)
+  - Partially redacted with x: `xx-xxx-XXXX` or `XX-XXX-XXXX`
+  - Partially redacted with asterisks: `**-***-XXXX`
 - **Phone**: Format `XXX-XXX-XXXX`
 - **Email**: Standard email address format
 

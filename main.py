@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 from pdf_redactor import PDFRedactor
-from config import SENSITIVE_PATTERNS
+from config import SENSITIVE_PATTERNS, generate_tin_variants
 
 
 def parse_arguments():
@@ -15,9 +15,10 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  %(prog)s -i tax_form.pdf -o redacted.pdf --name "John Doe" --ssn "123-45-6789"
+  %(prog)s -i tax_form.pdf -o redacted.pdf --name "John Doe" --tin "123-45-6789"
   %(prog)s -i document.pdf --auto-detect
   %(prog)s -i form.pdf --custom "Sensitive Info" --custom "Confidential"
+  %(prog)s -i business.pdf --tin "123456789"
         '''
     )
 
@@ -45,9 +46,9 @@ Examples:
     )
 
     parser.add_argument(
-        '--ssn',
+        '--tin',
         action='append',
-        help='SSN(s) to redact (can be used multiple times)'
+        help='TIN(s) to redact in all formats (SSN/EIN) - can be used multiple times'
     )
 
     parser.add_argument(
@@ -59,7 +60,7 @@ Examples:
     parser.add_argument(
         '--auto-detect',
         action='store_true',
-        help='Auto-detect and redact SSN, phone, and email patterns'
+        help='Auto-detect and redact TIN (SSN/EIN formats), phone, and email patterns'
     )
 
     parser.add_argument(
@@ -96,15 +97,19 @@ def main():
     if args.address:
         strings_to_redact.extend(args.address)
 
-    if args.ssn:
-        strings_to_redact.extend(args.ssn)
+    if args.tin:
+        # Generate all format variants for each TIN (both SSN and EIN formats)
+        for tin in args.tin:
+            variants = generate_tin_variants(tin)
+            strings_to_redact.extend(variants)
+            print(f"TIN variants generated: {len(variants)} formats for input '{tin}'")
 
     if args.custom:
         strings_to_redact.extend(args.custom)
 
     # Check if any redaction method is specified
     if not strings_to_redact and not args.auto_detect:
-        print("Error: No redaction criteria specified. Use --name, --address, --ssn, --custom, or --auto-detect",
+        print("Error: No redaction criteria specified. Use --name, --address, --tin, --custom, or --auto-detect",
               file=sys.stderr)
         sys.exit(1)
 
@@ -127,7 +132,7 @@ def main():
 
             # Redact patterns
             if args.auto_detect:
-                print("\nAuto-detecting sensitive patterns (SSN, phone, email)...")
+                print("\nAuto-detecting sensitive patterns (TIN, phone, email)...")
                 count = redactor.redact_patterns(SENSITIVE_PATTERNS)
                 total_redactions += count
                 print(f"  Applied {count} redaction(s)")
