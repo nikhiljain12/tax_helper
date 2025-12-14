@@ -1,9 +1,10 @@
 """PDF Redactor for removing sensitive information from PDF documents."""
 
-import fitz  # PyMuPDF
-from pathlib import Path
-from typing import List, Dict, Optional
 import re
+from pathlib import Path
+from typing import Dict, List
+
+import fitz  # PyMuPDF
 
 
 class PDFRedactor:
@@ -23,19 +24,21 @@ class PDFRedactor:
         self.pdf_path = Path(pdf_path)
 
         if not self.pdf_path.exists():
-            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
+            raise FileNotFoundError(f'PDF file not found: {pdf_path}')
 
         if not self.pdf_path.suffix.lower() == '.pdf':
-            raise ValueError(f"File must be a PDF: {pdf_path}")
+            raise ValueError(f'File must be a PDF: {pdf_path}')
 
         try:
             self.doc = fitz.open(str(self.pdf_path))
         except Exception as e:
-            raise ValueError(f"Unable to open PDF file: {e}")
+            raise ValueError(f'Unable to open PDF file: {e}')
 
         self.redaction_count = 0
 
-    def find_text_instances(self, page: fitz.Page, search_text: str, case_sensitive: bool = False) -> List[fitz.Rect]:
+    def find_text_instances(
+        self, page: fitz.Page, search_text: str, case_sensitive: bool = False
+    ) -> List[fitz.Rect]:
         """
         Find all instances of text on a page.
 
@@ -54,7 +57,9 @@ class PDFRedactor:
 
         return text_instances
 
-    def redact_exact_strings(self, strings: List[str], case_sensitive: bool = False) -> int:
+    def redact_exact_strings(
+        self, strings: List[str], case_sensitive: bool = False
+    ) -> int:
         """
         Redact exact string matches across all pages.
 
@@ -107,14 +112,14 @@ class PDFRedactor:
             page = self.doc[page_num]
 
             # Extract all text from the page with position information
-            text_dict = page.get_text("dict")
+            text_dict = page.get_text('dict')
 
-            for block in text_dict.get("blocks", []):
-                if block.get("type") == 0:  # Text block
-                    for line in block.get("lines", []):
-                        for span in line.get("spans", []):
-                            text = span.get("text", "")
-                            bbox = span.get("bbox", None)
+            for block in text_dict.get('blocks', []):
+                if block.get('type') == 0:  # Text block
+                    for line in block.get('lines', []):
+                        for span in line.get('spans', []):
+                            text = span.get('text', '')
+                            bbox = span.get('bbox', None)
 
                             if not text or not bbox:
                                 continue
