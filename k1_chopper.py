@@ -3,6 +3,7 @@ import json
 import re
 
 import anthropic
+import fitz  # PyMuPDF
 from openai import OpenAI
 
 filename = 'CVC_2024_K1_partnership_redacted.pdf'
@@ -86,7 +87,8 @@ def fetch_using_openai():
     client = OpenAI()
 
     response = client.responses.create(
-        model='gpt-5-mini',
+        model='gpt-5.1',
+        service_tier='flex',
         input=[
             {
                 'role': 'user',
@@ -106,6 +108,71 @@ def fetch_using_openai():
     )
 
     print(response.output_text)
+    return json.loads(response.output_text)
+
+
+def extract_pdf_pages(input_pdf_path, start_page, end_page):
+    """
+    Extract pages from a PDF file and return an in-memory PDF representation.
+
+    Args:
+        input_pdf_path: Path to the input PDF file
+        start_page: First page to extract (1-indexed)
+        end_page: Last page to extract (1-indexed, inclusive)
+
+    Returns:
+        bytes: PDF data as bytes, or None if an error occurred
+    """
+
+    if start_page is None or end_page is None or start_page < 1 or end_page < 1:
+        print('Invalid page numbers provided for extraction.')
+        return None
+
+    try:
+        with fitz.open(input_pdf_path) as pdf_document:
+            # Convert 1-indexed page numbers to 0-indexed
+            start_idx = start_page - 1
+            end_idx = end_page - 1
+
+            # Validate page numbers
+            if start_idx < 0 or end_idx >= pdf_document.page_count:
+                print(
+                    f'Error: Invalid page range. PDF has {pdf_document.page_count} pages.'
+                )
+                return None
+
+            if start_idx > end_idx:
+                print('Error: start_page must be less than or equal to end_page')
+                return None
+
+            # Create a new PDF for the output and extract pages
+            with fitz.open() as output_pdf:
+                output_pdf.insert_pdf(
+                    pdf_document, from_page=start_idx, to_page=end_idx
+                )
+                pdf_bytes = output_pdf.tobytes()
+
+        print(
+            f'Successfully extracted pages {start_page}-{end_page} ({len(pdf_bytes)} bytes)'
+        )
+        return pdf_bytes
+
+    except Exception as e:
+        print(f'Error extracting pages: {e}')
+        return None
+
+
+def chop_k1():
+    data = fetch_using_openai()
+    fed_page_nums = data.get('federal_k1_pages', {})
+    state_page_nums = data.get('state_k1_pages', {})
+    print(f'Federal K-1 pages: {fed_page_nums}')
+    # TODO: call function to chop the PDF based on these page numbers
+    fed_k1_pdf = extract_pdf_pages(
+        f'{datadir}/{filename}',
+        fed_page_nums.get('first_page'),
+        fed_page_nums.get('last_page'),
+    )
 
 
 if __name__ == '__main__':
