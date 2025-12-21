@@ -3,10 +3,11 @@ import json
 import re
 
 import anthropic
+from openai import OpenAI
 
-pdf_data = base64.b64encode(
-    open('data/CVC_2024_K1_partnership_redacted.pdf', 'rb').read()
-).decode('utf-8')
+filename = 'CVC_2024_K1_partnership_redacted.pdf'
+datadir = 'data'
+pdf_data = base64.b64encode(open(f'{datadir}/{filename}', 'rb').read()).decode('utf-8')
 
 task_prompt = """
 This PDF contains partnership tax information (form K-1 etc). 
@@ -42,37 +43,71 @@ Example output:
 }
 """
 
-client = anthropic.Anthropic()
 
-response = client.messages.create(
-    model='claude-sonnet-4-5',
-    max_tokens=1024,
-    messages=[
-        {
-            'role': 'user',
-            'content': [
-                {
-                    'type': 'document',
-                    'source': {
-                        'type': 'base64',
-                        'media_type': 'application/pdf',
-                        'data': pdf_data,
+def fetch_using_anthropic():
+    client = anthropic.Anthropic()
+
+    response = client.messages.create(
+        model='claude-haiku-4-5-20251001',  # 'claude-sonnet-4-5',
+        max_tokens=1024,
+        messages=[
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'document',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': 'application/pdf',
+                            'data': pdf_data,
+                        },
                     },
-                },
-                {
-                    'type': 'text',  # 'instruction',
-                    'text': task_prompt,
-                },
-            ],
-        },
-    ],
-)
+                    {
+                        'type': 'text',  # 'instruction',
+                        'text': task_prompt,
+                    },
+                ],
+            },
+        ],
+    )
 
-json_str = response.content[0].text
-print(json_str)
-# Remove markdown code block markers if present
-json_str_clean = re.sub(r'^```json\s*|\s*```$', '', json_str.strip())
+    json_str = response.content[0].text
+    print(json_str)
+    # Remove markdown code block markers if present
+    json_str_clean = re.sub(r'^```json\s*|\s*```$', '', json_str.strip())
 
-# Parse the JSON string
-data = json.loads(json_str_clean)
-print(data)
+    # Parse the JSON string
+    data = json.loads(json_str_clean)
+    print(data)
+    return data
+
+
+def fetch_using_openai():
+    client = OpenAI()
+
+    response = client.responses.create(
+        model='gpt-5-mini',
+        input=[
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': task_prompt,
+                    },
+                    {
+                        'type': 'input_file',
+                        'filename': filename,
+                        'file_data': f'data:application/pdf;base64,{pdf_data}',
+                    },
+                ],
+            }
+        ],
+    )
+
+    print(response.output_text)
+
+
+if __name__ == '__main__':
+    # fetch_using_anthropic()
+    fetch_using_openai()
