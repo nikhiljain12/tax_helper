@@ -1,14 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+import sys
+
 from PyInstaller.utils.hooks import collect_submodules
 
 
-hiddenimports = collect_submodules('fitz')
+PROJECT_ROOT = Path.cwd().resolve()
+MACOS_ICON = PROJECT_ROOT / 'build' / 'macos' / 'TaxPDFRedactor.icns'
+
+hiddenimports = collect_submodules('fitz') + collect_submodules('app')
 
 
 a = Analysis(
     ['desktop_main.py'],
-    pathex=[],
+    pathex=[str(PROJECT_ROOT)],
     binaries=[],
     datas=[],
     hiddenimports=hiddenimports,
@@ -43,3 +49,18 @@ coll = COLLECT(
     upx_exclude=[],
     name='TaxPDFRedactor',
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='TaxPDFRedactor.app',
+        icon=str(MACOS_ICON) if MACOS_ICON.exists() else None,
+        bundle_identifier='com.taxhelper.taxpdfredactor',
+        info_plist={
+            'CFBundleName': 'Tax PDF Redactor',
+            'CFBundleDisplayName': 'Tax PDF Redactor',
+            'CFBundleShortVersionString': '0.1.0',
+            'CFBundleVersion': '0.1.0',
+            'NSHighResolutionCapable': True,
+        },
+    )

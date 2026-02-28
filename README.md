@@ -21,6 +21,14 @@ A Python tool for permanently redacting sensitive information from PDF documents
 pip install -r requirements.txt
 ```
 
+For the desktop app and macOS packaging flow:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[build]"
+```
+
 ## Usage
 
 ### Basic Usage
@@ -51,6 +59,58 @@ If no output path is specified, the tool creates `<input>_redacted.pdf`:
 python main.py -i tax_form.pdf
 # Creates: tax_form_redacted.pdf
 ```
+
+## Desktop App
+
+Launch the desktop UI from the project virtualenv:
+
+```bash
+python desktop_main.py
+```
+
+Or use the installed console script:
+
+```bash
+tax-helper-desktop
+```
+
+## macOS Build
+
+On macOS, the recommended local build command is:
+
+```bash
+make mac-build
+```
+
+This command:
+
+- generates a placeholder app icon
+- builds `dist/TaxPDFRedactor.app`
+- packages `dist/TaxPDFRedactor.dmg`
+
+To clean only generated mac build artifacts:
+
+```bash
+make mac-clean
+```
+
+### macOS Packaging Notes
+
+The current macOS build is unsigned. Users may still see Gatekeeper warnings
+when opening the app on another Mac.
+
+This repository is now structured to be signed/notarization-ready in a later
+phase, which means the app bundle has stable metadata and the build output is a
+standard `.app` plus `.dmg`. A future release hardening phase would add
+commands such as:
+
+```bash
+codesign --deep --force --options runtime ...
+xcrun notarytool submit ...
+xcrun stapler staple ...
+```
+
+Those steps are intentionally not implemented yet.
 
 ## Command-Line Options
 
@@ -136,15 +196,22 @@ When using `--auto-detect`, the tool searches for:
 ```
 k1_analyzer/
 ├── main.py              # CLI entry point
+├── desktop_main.py      # Desktop app entry point
+├── app/                 # Shared core, services, and desktop UI
 ├── pdf_redactor.py      # Core redaction logic
 ├── config.py            # Sensitive pattern configurations
+├── Makefile             # Local macOS packaging targets
 ├── requirements.txt     # Python dependencies
+├── desktop_app.spec     # PyInstaller desktop build config
+├── packaging/           # Platform packaging scripts
 └── README.md           # This file
 ```
 
 ## Dependencies
 
 - **PyMuPDF** (fitz): PDF manipulation library for reading, modifying, and redacting PDFs
+- **PySide6**: Desktop UI framework
+- **PyInstaller**: Desktop app bundling
 
 ## License
 
