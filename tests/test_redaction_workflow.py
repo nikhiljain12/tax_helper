@@ -126,6 +126,74 @@ class RedactionWorkflowTests(unittest.TestCase):
         self.assertEqual(1, len(analysis.warnings))
         self.assertIn('text-based PDFs only', analysis.warnings[0])
 
+    def test_apply_removes_overlapping_form_widgets(self) -> None:
+        input_path = self.temp_path / 'widget_sample.pdf'
+        output_path = self.temp_path / 'widget_sample_redacted.pdf'
+        self._create_pdf_with_text_widget(
+            input_path,
+            static_text='Name: Nikhil Jain',
+            widget_value='123-45-6789',
+        )
+
+        request = self.workflow.build_request(
+            input_path=input_path,
+            names=['Nikhil Jain'],
+            detect_tin=True,
+        )
+
+        analysis = self.engine.analyze(request)
+        result = self.engine.apply(
+            input_path=input_path,
+            matches=analysis.matches,
+            selected_match_ids={match.match_id for match in analysis.matches},
+            output_path=output_path,
+        )
+
+        self.assertTrue(result.output_path.exists())
+
+        doc = fitz.open(str(output_path))
+        try:
+            page = doc[0]
+            self.assertNotIn('Nikhil Jain', page.get_text('text'))
+            self.assertNotIn('123-45-6789', page.get_text('text'))
+            self.assertEqual([], list(page.widgets() or []))
+        finally:
+            doc.close()
+
+    def test_apply_removes_overlapping_freetext_annotations(self) -> None:
+        input_path = self.temp_path / 'annot_sample.pdf'
+        output_path = self.temp_path / 'annot_sample_redacted.pdf'
+        self._create_pdf_with_freetext_annot(
+            input_path,
+            static_text='Name: Nikhil Jain',
+            annot_text='123-45-6789',
+        )
+
+        request = self.workflow.build_request(
+            input_path=input_path,
+            names=['Nikhil Jain'],
+            detect_tin=True,
+        )
+
+        analysis = self.engine.analyze(request)
+        result = self.engine.apply(
+            input_path=input_path,
+            matches=analysis.matches,
+            selected_match_ids={match.match_id for match in analysis.matches},
+            output_path=output_path,
+        )
+
+        self.assertTrue(result.output_path.exists())
+
+        doc = fitz.open(str(output_path))
+        try:
+            page = doc[0]
+            self.assertNotIn('Nikhil Jain', page.get_text('text'))
+            self.assertNotIn('123-45-6789', page.get_text('text'))
+            self.assertEqual([], list(page.annots() or []))
+        finally:
+            doc.close()
+
     def test_default_output_path_appends_redacted_suffix(self) -> None:
         expected = self.temp_path / 'document_redacted.pdf'
         actual = self.file_service.default_output_path(self.temp_path / 'document.pdf')
@@ -141,6 +209,39 @@ class RedactionWorkflowTests(unittest.TestCase):
     def _create_blank_pdf(self, path: Path) -> None:
         doc = fitz.open()
         doc.new_page()
+        doc.save(path)
+        doc.close()
+
+    def _create_pdf_with_text_widget(
+        self,
+        path: Path,
+        static_text: str,
+        widget_value: str,
+    ) -> None:
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), static_text)
+
+        widget = fitz.Widget()
+        widget.field_name = 'sensitive_field'
+        widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
+        widget.field_value = widget_value
+        widget.rect = fitz.Rect(72, 100, 220, 120)
+        page.add_widget(widget)
+
+        doc.save(path)
+        doc.close()
+
+    def _create_pdf_with_freetext_annot(
+        self,
+        path: Path,
+        static_text: str,
+        annot_text: str,
+    ) -> None:
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), static_text)
+        page.add_freetext_annot(fitz.Rect(72, 100, 220, 130), annot_text)
         doc.save(path)
         doc.close()
 

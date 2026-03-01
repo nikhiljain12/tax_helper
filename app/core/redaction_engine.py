@@ -91,6 +91,7 @@ class RedactionEngine:
 
         doc = self._open_document(source_path)
         redaction_count = 0
+        selected_rects_by_page: dict[int, list[fitz.Rect]] = {}
 
         try:
             for match in matches:
@@ -99,11 +100,16 @@ class RedactionEngine:
 
                 page = doc[match.page_number - 1]
                 for rect_tuple in match.rects:
-                    page.add_redact_annot(fitz.Rect(rect_tuple), fill=(0, 0, 0))
+                    rect = fitz.Rect(rect_tuple)
+                    page.add_redact_annot(rect, fill=(0, 0, 0))
+                    selected_rects_by_page.setdefault(match.page_number, []).append(rect)
                     redaction_count += 1
 
             if redaction_count == 0:
                 raise ValueError('No selected redactions were found to apply.')
+
+            for page_number, rects in selected_rects_by_page.items():
+                self._remove_overlapping_annotations(doc[page_number - 1], rects)
 
             for page in doc:
                 page.apply_redactions()
@@ -315,3 +321,24 @@ class RedactionEngine:
             unique_rects.append(rect)
 
         return unique_rects
+
+    def _remove_overlapping_annotations(
+        self,
+        page: fitz.Page,
+        redaction_rects: list[fitz.Rect],
+    ) -> None:
+        # Form fields and other annotations can render through appearance
+        # streams that survive page-content redactions unless removed first.
+        for widget in list(page.widgets() or []):
+            widget_rect = fitz.Rect(widget.rect)
+            if any(widget_rect.intersects(redaction_rect) for redaction_rect in redaction_rects):
+                page.delete_widget(widget)
+
+        for annot in list(page.annots() or []):
+            annot_type, _ = annot.type
+            if annot_type == fitz.PDF_ANNOT_REDACT:
+                continue
+
+            annot_rect = fitz.Rect(annot.rect)
+            if any(annot_rect.intersects(redaction_rect) for redaction_rect in redaction_rects):
+                page.delete_annot(annot)
