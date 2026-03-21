@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QThreadPool, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QStackedWidget,
 )
 
 from app.core.models import DocumentAnalysis, PDFFileInfo, RedactionResult
 from app.core.redaction_engine import RedactionEngine
+from app.services.app_settings import AppSettings
 from app.services.file_service import FileService
 from app.services.redaction_workflow import RedactionWorkflowService
 from app.ui.progress_dialog import BusyProgressDialog
@@ -33,6 +36,7 @@ class MainWindow(QMainWindow):
         self.engine = RedactionEngine()
         self.workflow = RedactionWorkflowService()
         self.file_service = FileService()
+        self.app_settings = AppSettings()
         self.thread_pool = QThreadPool.globalInstance()
 
         self.current_file_info: PDFFileInfo | None = None
@@ -66,6 +70,54 @@ class MainWindow(QMainWindow):
         self.result_panel.reset_button.clicked.connect(self.reset_flow)
 
         self._apply_styles()
+        self._build_menu_bar()
+
+    def _build_menu_bar(self) -> None:
+        """Create the native application menu bar."""
+        menu_bar = self.menuBar()
+
+        file_menu = menu_bar.addMenu("&File")
+
+        open_action = QAction("&Open...", self)
+        open_action.setShortcut("Ctrl+O")  # Qt maps Ctrl+O to Cmd+O on macOS
+        open_action.triggered.connect(self.choose_pdf)
+        file_menu.addAction(open_action)
+
+        self._recent_menu = QMenu("Open &Recent", self)
+        self._recent_menu.aboutToShow.connect(self._populate_recent_menu)
+        file_menu.addMenu(self._recent_menu)
+
+        file_menu.addSeparator()
+
+        if sys.platform != "darwin":
+            quit_action = QAction("&Quit", self)
+            quit_action.setShortcut("Ctrl+Q")
+            quit_action.triggered.connect(self.close)
+            file_menu.addAction(quit_action)
+
+    def _populate_recent_menu(self) -> None:
+        """Rebuild the Open Recent submenu before it is shown."""
+        self._recent_menu.clear()
+
+        recent = self.app_settings.recent_files()
+        if recent:
+            for path_str in recent:
+                action = QAction(Path(path_str).name, self)
+                action.setToolTip(path_str)
+                action.triggered.connect(lambda checked, p=path_str: self.load_pdf(p))
+                self._recent_menu.addAction(action)
+
+            self._recent_menu.addSeparator()
+            clear_action = QAction("Clear Recents", self)
+            clear_action.triggered.connect(self._clear_recent_files)
+            self._recent_menu.addAction(clear_action)
+        else:
+            no_items = QAction("No Recent Files", self)
+            no_items.setEnabled(False)
+            self._recent_menu.addAction(no_items)
+
+    def _clear_recent_files(self) -> None:
+        self.app_settings.clear_recent_files()
 
     def choose_pdf(self) -> None:
         """Open the native file picker."""
@@ -73,7 +125,7 @@ class MainWindow(QMainWindow):
         filename, _ = QFileDialog.getOpenFileName(
             self,
             'Choose PDF',
-            str(Path.home()),
+            self.app_settings.last_open_dir(),
             'PDF Files (*.pdf)',
         )
         if filename:
@@ -92,6 +144,7 @@ class MainWindow(QMainWindow):
         self.current_analysis = None
         self.current_result = None
         self.upload_panel.set_file_info(file_info)
+        self.app_settings.add_recent_file(str(file_info.path))
         self.stack.setCurrentWidget(self.upload_panel)
 
     def start_analysis(self) -> None:
