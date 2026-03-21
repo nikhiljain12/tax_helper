@@ -163,18 +163,52 @@ def extract_pdf_pages(input_pdf_path, start_page, end_page):
 
 
 def chop_k1():
-    data = fetch_using_openai()
+    # data = fetch_using_openai()
+    data = {
+        'federal_k1_pages': {'first_page': 2, 'last_page': 8},
+        'federal_k3_pages': {'first_page': 9, 'last_page': 18},
+        'state_k1_pages': {
+            'AR': {'first_page': 19, 'last_page': 20},
+            'CA': {'first_page': 21, 'last_page': 28},
+            'CO': {'first_page': 29, 'last_page': 31},
+            'GA': {'first_page': 32, 'last_page': 33},
+            'IA': {'first_page': 37, 'last_page': 39},
+            'IN': {'first_page': 34, 'last_page': 36},
+            'MN': {'first_page': 40, 'last_page': 44},
+            'NC': {'first_page': 54, 'last_page': 60},
+            'NJ': {'first_page': 45, 'last_page': 45},
+            'NM': {'first_page': 46, 'last_page': 47},
+            'NY': {'first_page': 48, 'last_page': 53},
+            'OH': {'first_page': 61, 'last_page': 61},
+            'OK': {'first_page': 62, 'last_page': 63},
+            'OR': {'first_page': 64, 'last_page': 64},
+            'PA': {'first_page': 65, 'last_page': 65},
+            'WV': {'first_page': 66, 'last_page': 67},
+            'WI': {'first_page': 68, 'last_page': 73},
+        },
+    }
     fed_page_nums = data.get('federal_k1_pages', {})
     state_page_nums = data.get('state_k1_pages', {})
     print(f'Federal K-1 pages: {fed_page_nums}')
     # TODO: call function to chop the PDF based on these page numbers
-    fed_k1_pdf = extract_pdf_pages(
+    pdfs = {}
+    pdfs['fed'] = extract_pdf_pages(
         f'{datadir}/{filename}',
         fed_page_nums.get('first_page'),
         fed_page_nums.get('last_page'),
     )
 
+    for state_abbr, page_nums in state_page_nums.items():
+        pdfs[state_abbr] = extract_pdf_pages(
+            f'{datadir}/{filename}',
+            page_nums.get('first_page'),
+            page_nums.get('last_page'),
+        )
+
+    return pdfs
+
 
 if __name__ == '__main__':
     # fetch_using_anthropic()
-    fetch_using_openai()
+    # fetch_using_openai()
+    chop_k1()

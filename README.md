@@ -96,21 +96,46 @@ make mac-clean
 
 ### macOS Packaging Notes
 
-The current macOS build is unsigned. Users may still see Gatekeeper warnings
-when opening the app on another Mac.
+If you run `make mac-build` with no extra environment variables, the output is
+unsigned. That is usually fine for local testing on the same Mac, but Gatekeeper
+will often block the app when it is sent to another Mac.
 
-This repository is now structured to be signed/notarization-ready in a later
-phase, which means the app bundle has stable metadata and the build output is a
-standard `.app` plus `.dmg`. A future release hardening phase would add
-commands such as:
+To produce a distributable macOS build, export a Developer ID Application
+identity and optionally a notarytool keychain profile before running
+`make mac-build`.
 
 ```bash
-codesign --deep --force --options runtime ...
-xcrun notarytool submit ...
-xcrun stapler staple ...
+export MACOS_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export MACOS_NOTARY_PROFILE="taxpdfredactor-notary"
+make mac-build
 ```
 
-Those steps are intentionally not implemented yet.
+Supported packaging environment variables:
+
+- `MACOS_CODESIGN_IDENTITY`: signs `dist/TaxPDFRedactor.app` and `dist/TaxPDFRedactor.dmg`
+- `MACOS_NOTARY_PROFILE`: notarizes and staples the DMG with `xcrun notarytool`
+
+Set up the notarytool profile once on the build machine:
+
+```bash
+xcrun notarytool store-credentials "taxpdfredactor-notary" \
+  --apple-id "your-apple-id@example.com" \
+  --team-id "TEAMID" \
+  --password "app-specific-password"
+```
+
+With both variables set, the build script will:
+
+- sign the `.app`
+- package the signed app into `dist/TaxPDFRedactor.dmg`
+- sign the `.dmg`
+- submit the DMG for notarization
+- staple the notarization ticket to the DMG
+
+If you need to bypass Gatekeeper for an already-built unsigned copy, the
+recipient can Control-click the app and choose `Open`, or allow it in
+System Settings > Privacy & Security. That is only a workaround; signing and
+notarization is the proper fix for distribution.
 
 ## Command-Line Options
 

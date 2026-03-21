@@ -25,11 +25,18 @@ mac-build:
 		echo "Missing 'hdiutil'. macOS DMG creation is unavailable."; \
 		exit 1; \
 	fi
+	@if [ -n "$$MACOS_NOTARY_PROFILE" ] && [ -z "$$MACOS_CODESIGN_IDENTITY" ]; then \
+		echo "Set MACOS_CODESIGN_IDENTITY when using MACOS_NOTARY_PROFILE."; \
+		exit 1; \
+	fi
 	$(PYTHON) $(ICON_SCRIPT) $(ICON_PATH)
 	PYINSTALLER_CONFIG_DIR="$(PYINSTALLER_CACHE)" $(PYINSTALLER) -y desktop_app.spec
 	bash packaging/macos/build_dmg.sh
 	@echo "Built app bundle: $(APP_PATH)"
 	@echo "Built disk image: $(DMG_PATH)"
+	@if [ -z "$$MACOS_CODESIGN_IDENTITY" ]; then \
+		echo "Build is unsigned. Gatekeeper may block it on other Macs."; \
+	fi
 
 mac-clean:
 	rm -rf build/desktop_app \
