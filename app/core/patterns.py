@@ -9,31 +9,31 @@ from app.core.models import RedactionCategory
 PATTERN_DEFINITIONS: dict[str, tuple[RedactionCategory, re.Pattern[str]]] = {
     'ssn_dashed': (
         RedactionCategory.TIN,
-        re.compile(r'\b\d{3}-\d{2}-\d{4}\b'),
+        re.compile(r'(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)'),
     ),
     'ssn_plain': (
         RedactionCategory.TIN,
-        re.compile(r'\b\d{9}\b'),
+        re.compile(r'(?<!\d)\d{9}(?!\d)'),
     ),
     'ssn_partial_x': (
         RedactionCategory.TIN,
-        re.compile(r'\b[xX]{3}-[xX]{2}-\d{4}\b'),
+        re.compile(r'(?<!\w)[xX]{3}-[xX]{2}-\d{4}(?!\d)'),
     ),
     'ssn_partial_asterisk': (
         RedactionCategory.TIN,
-        re.compile(r'\b\*{3}-\*{2}-\d{4}\b'),
+        re.compile(r'\*{3}-\*{2}-\d{4}(?!\d)'),
     ),
     'ein_dashed': (
         RedactionCategory.TIN,
-        re.compile(r'\b\d{2}-\d{7}\b'),
+        re.compile(r'(?<!\d)\d{2}-\d{7}(?!\d)'),
     ),
     'ein_plain': (
         RedactionCategory.TIN,
-        re.compile(r'(?<!\d)\b\d{9}\b(?!\d)'),
+        re.compile(r'(?<!\d)\d{9}(?!\d)'),
     ),
     'phone': (
         RedactionCategory.PHONE,
-        re.compile(r'\b\d{3}-\d{3}-\d{4}\b'),
+        re.compile(r'(?<!\d)\d{3}-\d{3}-\d{4}(?!\d)'),
     ),
     'email': (
         RedactionCategory.EMAIL,
