@@ -6,7 +6,6 @@ import re
 
 from app.core.models import RedactionCategory
 
-
 PATTERN_DEFINITIONS: dict[str, tuple[RedactionCategory, re.Pattern[str]]] = {
     'ssn_dashed': (
         RedactionCategory.TIN,
@@ -18,11 +17,11 @@ PATTERN_DEFINITIONS: dict[str, tuple[RedactionCategory, re.Pattern[str]]] = {
     ),
     'ssn_partial_x': (
         RedactionCategory.TIN,
-        re.compile(r'\b[xX]{2}-[xX]{3}-\d{4}\b'),
+        re.compile(r'\b[xX]{3}-[xX]{2}-\d{4}\b'),
     ),
     'ssn_partial_asterisk': (
         RedactionCategory.TIN,
-        re.compile(r'\b\*{2}-\*{3}-\d{4}\b'),
+        re.compile(r'\b\*{3}-\*{2}-\d{4}\b'),
     ),
     'ein_dashed': (
         RedactionCategory.TIN,

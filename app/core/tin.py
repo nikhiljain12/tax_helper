@@ -18,9 +18,11 @@ def generate_tin_variants(tin: str) -> list[str]:
 
     return [
         f'{digits[0:3]}-{digits[3:5]}-{digits[5:9]}',
-        f'xx-xxx-{digits[5:9]}',
-        f'XX-XXX-{digits[5:9]}',
-        f'**-***-{digits[5:9]}',
+        f'xxx-xx-{digits[5:9]}',
+        f'XXX-XX-{digits[5:9]}',
+        f'***-**-{digits[5:9]}',
+        f'*****-{digits[5:9]}',
+        f'xxxxx-{digits[5:9]}',
         f'{digits[0:2]}-{digits[2:9]}',
         digits,
     ]
