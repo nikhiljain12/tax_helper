@@ -130,7 +130,7 @@ input_folder/sub_a/file2_redacted.pdf  →  skipped
 
 ```python
 class BatchProgressSignals(QObject):
-    file_started = Signal(int, int, str)  # (current_index, total, filename)
+    file_started = Signal(int, int, str)  # (current_index, total, relative_filename)
     file_done = Signal(object)            # BatchFileResult
     all_done = Signal(object)             # list[BatchFileResult]
     failed = Signal(str)                  # fatal pre-loop error
@@ -142,13 +142,15 @@ class BatchFolderWorker(QRunnable):
         engine: RedactionEngine,
         items: list[BatchFileItem],
         request_template: RedactionRequest,
+        input_folder: Path,               # used to compute relative display paths
     ) -> None: ...
 ```
 
 **Processing loop** (background thread):
 1. Emit `failed` and return early if `items` is empty.
 2. For each `BatchFileItem` at index `i`:
-   a. Emit `file_started(i + 1, total, item.input_path.name)`
+   a. Compute `display_name = str(item.input_path.relative_to(input_folder))` for display (e.g. `sub_b/file4.pdf`)
+   b. Emit `file_started(i + 1, total, display_name)`
    b. Build per-file request: `dataclasses.replace(request_template, input_path=item.input_path)`
    c. Call `engine.analyze(request)` — catch any exception → `BatchFileResult(status=ERROR, error_message=...)`
    d. If `analysis.matches` is empty → `BatchFileResult(status=NO_MATCHES)`
@@ -203,9 +205,9 @@ Layout:
 
 **Key behaviors:**
 - File paths displayed relative to input folder
-- Match counts shown as `TIN:3 Name:1` inline; full output path shown in tooltip
+- Match counts shown as `TIN:3 Name:1` inline; full output path shown in tooltip for `REDACTED` rows only — `NO_MATCHES` rows have no output file and the tooltip should show nothing or "No output written"
 - Error rows: clicking `▶` expands the full error message inline
-- `NO_MATCHES` rows show `—` and no match detail
+- `NO_MATCHES` rows show `—` and no match detail; **no output file is created** for these rows (the worker returns after `analyze()` without calling `apply()`)
 - Summary counts in header (redacted / no matches / errors)
 - "Open Output Folder" → opens output folder root in Finder/Explorer
 - "Redact Another Folder" → calls `MainWindow.reset_flow()`
