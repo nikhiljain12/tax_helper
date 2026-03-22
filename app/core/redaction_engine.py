@@ -185,7 +185,7 @@ class RedactionEngine:
                 rects = self._search_for_text(
                     page=page,
                     search_text=match_text,
-                    case_sensitive=True,
+                    case_sensitive=False,
                 )
                 if not rects:
                     continue
