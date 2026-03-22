@@ -112,6 +112,7 @@ class BatchFileResult:
 
     @property
     def total_matches(self) -> int:
+        """Sum of match counts across all redaction categories."""
         return sum(self.match_counts.values())
 
 
