@@ -13,7 +13,6 @@ from app.core.models import (
     BatchFileItem,
     BatchFileStatus,
     DocumentAnalysis,
-    ExactValueRule,
     RedactionCategory,
     RedactionMatch,
     RedactionRequest,
@@ -32,9 +31,9 @@ def _make_request() -> RedactionRequest:
     )
 
 
-def _make_match(category: RedactionCategory = RedactionCategory.TIN) -> RedactionMatch:
+def _make_match(category: RedactionCategory = RedactionCategory.TIN, match_id: str = 'id1') -> RedactionMatch:
     return RedactionMatch(
-        match_id='id1',
+        match_id=match_id,
         category=category,
         text='123-45-6789',
         page_number=1,
@@ -87,9 +86,9 @@ class TestBatchFolderWorker(unittest.TestCase):
             output_path=Path('/fake/output/file_redacted.pdf'),
         )
         matches = [
-            _make_match(RedactionCategory.TIN),
-            _make_match(RedactionCategory.TIN),
-            _make_match(RedactionCategory.NAME),
+            _make_match(RedactionCategory.TIN, match_id='m1'),
+            _make_match(RedactionCategory.TIN, match_id='m2'),
+            _make_match(RedactionCategory.NAME, match_id='m3'),
         ]
         analysis = DocumentAnalysis(page_count=1, matches=matches, warnings=[])
 
@@ -229,7 +228,7 @@ class TestBatchFolderWorker(unittest.TestCase):
 
         engine.apply.assert_called_once()
         call_kwargs = engine.apply.call_args
-        selected_ids = call_kwargs.kwargs.get('selected_match_ids') or call_kwargs[1].get('selected_match_ids') or call_kwargs[0][2]
+        selected_ids = call_kwargs.kwargs['selected_match_ids']
         self.assertEqual({'id1', 'id2'}, selected_ids)
 
     def test_file_started_signal_emits_relative_path(self) -> None:
