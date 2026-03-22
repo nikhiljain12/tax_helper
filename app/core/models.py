@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
@@ -82,6 +82,37 @@ class RedactionResult:
 
     output_path: Path
     redaction_count: int
+
+
+class BatchFileStatus(str, Enum):
+    """Outcome status for a single file in a batch run."""
+
+    REDACTED = 'redacted'
+    NO_MATCHES = 'no_matches'
+    ERROR = 'error'
+
+
+@dataclass
+class BatchFileItem:
+    """A planned input→output file pair for a batch run."""
+
+    input_path: Path
+    output_path: Path
+
+
+@dataclass
+class BatchFileResult:
+    """Outcome for a single file processed during a batch run."""
+
+    input_path: Path
+    output_path: Path
+    status: BatchFileStatus
+    match_counts: dict[RedactionCategory, int] = field(default_factory=dict)
+    error_message: str | None = None
+
+    @property
+    def total_matches(self) -> int:
+        return sum(self.match_counts.values())
 
 
 @dataclass(frozen=True)
