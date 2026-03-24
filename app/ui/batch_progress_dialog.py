@@ -40,3 +40,8 @@ class BatchProgressDialog(QDialog):
         """Slot connected to BatchFolderWorker.signals.file_started."""
         self._progress_bar.setValue(current_index)
         self._file_label.setText(f'Currently: {display_name}')
+
+    def complete(self) -> None:
+        """Set the progress bar to 100% and update the label."""
+        self._progress_bar.setValue(self._progress_bar.maximum())
+        self._file_label.setText('Complete!')

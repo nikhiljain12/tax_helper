@@ -265,6 +265,12 @@ class UploadPanel(QWidget):
         if folder:
             self._output_folder_edit.setText(folder)
 
+    def set_batch_input_folder(self, folder: str) -> None:
+        """Switch to batch mode and set the input folder path."""
+        self._batch_folder_btn.setChecked(True)
+        self._on_mode_changed()
+        self._input_folder_edit.setText(folder)
+
     def set_file_info(self, file_info: PDFFileInfo | None) -> None:
         """Update the selected file summary."""
 
