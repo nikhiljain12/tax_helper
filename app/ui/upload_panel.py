@@ -6,11 +6,15 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
+    QMessageBox,
     QPushButton,
     QPlainTextEdit,
     QVBoxLayout,
@@ -77,6 +81,7 @@ class UploadPanel(QWidget):
 
     choose_pdf_requested = Signal()
     analyze_requested = Signal()
+    batch_requested = Signal(Path, Path)  # (input_folder, output_folder)
 
     def __init__(self) -> None:
         super().__init__()
@@ -91,6 +96,27 @@ class UploadPanel(QWidget):
         privacy_note = QLabel('Files never leave your computer.')
         privacy_note.setObjectName('privacyNote')
 
+        # --- Mode toggle ---
+        self._single_file_btn = QPushButton('Single File')
+        self._single_file_btn.setCheckable(True)
+        self._single_file_btn.setChecked(True)
+
+        self._batch_folder_btn = QPushButton('Batch Folder')
+        self._batch_folder_btn.setCheckable(True)
+
+        self._mode_group = QButtonGroup(self)
+        self._mode_group.addButton(self._single_file_btn)
+        self._mode_group.addButton(self._batch_folder_btn)
+        self._mode_group.setExclusive(True)
+        self._mode_group.buttonClicked.connect(self._on_mode_changed)
+
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(0)
+        mode_row.addWidget(self._single_file_btn)
+        mode_row.addWidget(self._batch_folder_btn)
+        mode_row.addStretch(1)
+
+        # --- Single file widgets ---
         self.drop_area = DropArea()
         self.drop_area.setMinimumHeight(160)
 
@@ -105,6 +131,51 @@ class UploadPanel(QWidget):
         file_controls.addWidget(self.choose_pdf_button, 0)
         file_controls.addWidget(self.file_summary_label, 1)
 
+        self._single_file_widget = QWidget()
+        sf_layout = QVBoxLayout(self._single_file_widget)
+        sf_layout.setContentsMargins(0, 0, 0, 0)
+        sf_layout.setSpacing(8)
+        sf_layout.addWidget(self.drop_area)
+        sf_layout.addLayout(file_controls)
+
+        # --- Batch folder widgets ---
+        self._input_folder_edit = QLineEdit()
+        self._input_folder_edit.setPlaceholderText('Select input folder...')
+        self._input_folder_edit.setReadOnly(True)
+
+        input_browse_btn = QPushButton('Browse...')
+        input_browse_btn.clicked.connect(self.choose_input_folder)
+
+        input_row = QHBoxLayout()
+        input_row.addWidget(QLabel('Input folder:'))
+        input_row.addWidget(self._input_folder_edit, 1)
+        input_row.addWidget(input_browse_btn)
+
+        self._output_folder_edit = QLineEdit()
+        self._output_folder_edit.setPlaceholderText('Default: <input_folder>/redacted/')
+        self._output_folder_edit.setReadOnly(True)
+
+        output_browse_btn = QPushButton('Browse...')
+        output_browse_btn.clicked.connect(self.choose_output_folder)
+
+        output_clear_btn = QPushButton('Clear')
+        output_clear_btn.clicked.connect(self._output_folder_edit.clear)
+
+        output_row = QHBoxLayout()
+        output_row.addWidget(QLabel('Output folder:'))
+        output_row.addWidget(self._output_folder_edit, 1)
+        output_row.addWidget(output_browse_btn)
+        output_row.addWidget(output_clear_btn)
+
+        self._batch_folder_widget = QWidget()
+        bf_layout = QVBoxLayout(self._batch_folder_widget)
+        bf_layout.setContentsMargins(0, 0, 0, 0)
+        bf_layout.setSpacing(8)
+        bf_layout.addLayout(input_row)
+        bf_layout.addLayout(output_row)
+        self._batch_folder_widget.setVisible(False)
+
+        # --- Shared options form (unchanged) ---
         form_title = QLabel('Redaction options')
         form_title.setObjectName('sectionTitle')
 
@@ -113,18 +184,10 @@ class UploadPanel(QWidget):
         form_layout.setFormAlignment(Qt.AlignTop)
         form_layout.setSpacing(12)
 
-        self.names_input = self._build_text_input(
-            'One entry per line, for example:\nJohn Doe'
-        )
-        self.addresses_input = self._build_text_input(
-            'One entry per line, for example:\n123 Main Street'
-        )
-        self.tins_input = self._build_text_input(
-            'One entry per line, for example:\n123-45-6789'
-        )
-        self.custom_input = self._build_text_input(
-            'One entry per line for any additional exact values'
-        )
+        self.names_input = self._build_text_input('One entry per line, for example:\nJohn Doe')
+        self.addresses_input = self._build_text_input('One entry per line, for example:\n123 Main Street')
+        self.tins_input = self._build_text_input('One entry per line, for example:\n123-45-6789')
+        self.custom_input = self._build_text_input('One entry per line for any additional exact values')
 
         form_layout.addRow('Names', self.names_input)
         form_layout.addRow('Addresses', self.addresses_input)
@@ -149,12 +212,13 @@ class UploadPanel(QWidget):
 
         self.find_matches_button = QPushButton('Find Matches')
         self.find_matches_button.setObjectName('primaryButton')
-        self.find_matches_button.clicked.connect(self.analyze_requested.emit)
+        self.find_matches_button.clicked.connect(self._on_primary_action)
 
         layout.addWidget(title)
         layout.addWidget(privacy_note)
-        layout.addWidget(self.drop_area)
-        layout.addLayout(file_controls)
+        layout.addLayout(mode_row)
+        layout.addWidget(self._single_file_widget)
+        layout.addWidget(self._batch_folder_widget)
         layout.addWidget(form_title)
         layout.addLayout(form_layout)
         layout.addWidget(detect_title)
@@ -162,6 +226,50 @@ class UploadPanel(QWidget):
         layout.addWidget(self.case_sensitive_checkbox)
         layout.addStretch(1)
         layout.addWidget(self.find_matches_button, 0, Qt.AlignRight)
+
+    def _on_mode_changed(self, _button=None) -> None:
+        is_batch = self._batch_folder_btn.isChecked()
+        self._single_file_widget.setVisible(not is_batch)
+        self._batch_folder_widget.setVisible(is_batch)
+        self.find_matches_button.setText('Redact Folder' if is_batch else 'Find Matches')
+
+    def _on_primary_action(self) -> None:
+        if self._batch_folder_btn.isChecked():
+            self._emit_batch_requested()
+        else:
+            self.analyze_requested.emit()
+
+    def _emit_batch_requested(self) -> None:
+        input_path_str = self._input_folder_edit.text().strip()
+        if not input_path_str:
+            QMessageBox.warning(self, 'Tax PDF Redactor', 'Please select an input folder.')
+            return
+
+        input_folder = Path(input_path_str)
+        if not input_folder.is_dir():
+            QMessageBox.warning(self, 'Tax PDF Redactor', 'Input folder does not exist.')
+            return
+
+        output_path_str = self._output_folder_edit.text().strip()
+        output_folder = Path(output_path_str) if output_path_str else input_folder / 'redacted'
+
+        self.batch_requested.emit(input_folder, output_folder)
+
+    def choose_input_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, 'Choose Input Folder')
+        if folder:
+            self._input_folder_edit.setText(folder)
+
+    def choose_output_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, 'Choose Output Folder')
+        if folder:
+            self._output_folder_edit.setText(folder)
+
+    def set_batch_input_folder(self, folder: str) -> None:
+        """Switch to batch mode and set the input folder path."""
+        self._batch_folder_btn.setChecked(True)
+        self._on_mode_changed()
+        self._input_folder_edit.setText(folder)
 
     def set_file_info(self, file_info: PDFFileInfo | None) -> None:
         """Update the selected file summary."""
@@ -203,6 +311,10 @@ class UploadPanel(QWidget):
         self.detect_phone_checkbox.setChecked(False)
         self.detect_email_checkbox.setChecked(False)
         self.case_sensitive_checkbox.setChecked(False)
+        self._input_folder_edit.clear()
+        self._output_folder_edit.clear()
+        self._single_file_btn.setChecked(True)
+        self._on_mode_changed()
 
     def _build_text_input(self, placeholder: str) -> QPlainTextEdit:
         text_edit = QPlainTextEdit()

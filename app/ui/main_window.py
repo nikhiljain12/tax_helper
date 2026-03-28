@@ -15,16 +15,19 @@ from PySide6.QtWidgets import (
     QStackedWidget,
 )
 
-from app.core.models import DocumentAnalysis, PDFFileInfo, RedactionResult
+from app.core.models import BatchFileResult, DocumentAnalysis, PDFFileInfo, RedactionResult
 from app.core.redaction_engine import RedactionEngine
 from app.services.app_settings import AppSettings
 from app.services.file_service import FileService
+from app.services.folder_scan_service import FolderScanService
 from app.services.redaction_workflow import RedactionWorkflowService
+from app.ui.batch_progress_dialog import BatchProgressDialog
+from app.ui.batch_result_panel import BatchResultPanel
 from app.ui.progress_dialog import BusyProgressDialog
 from app.ui.result_panel import ResultPanel
 from app.ui.review_panel import ReviewPanel
 from app.ui.upload_panel import UploadPanel
-from app.ui.workers import AnalyzeWorker, ApplyWorker
+from app.ui.workers import AnalyzeWorker, ApplyWorker, BatchFolderWorker
 
 
 class MainWindow(QMainWindow):
@@ -53,10 +56,13 @@ class MainWindow(QMainWindow):
         self.upload_panel = UploadPanel()
         self.review_panel = ReviewPanel()
         self.result_panel = ResultPanel()
+        self.batch_result_panel = BatchResultPanel()
+        self.folder_scan_service = FolderScanService()
 
         self.stack.addWidget(self.upload_panel)
         self.stack.addWidget(self.review_panel)
         self.stack.addWidget(self.result_panel)
+        self.stack.addWidget(self.batch_result_panel)
 
         self.upload_panel.choose_pdf_requested.connect(self.choose_pdf)
         self.upload_panel.drop_area.file_dropped.connect(self.load_pdf)
@@ -68,6 +74,9 @@ class MainWindow(QMainWindow):
         self.result_panel.open_file_button.clicked.connect(self.open_result_file)
         self.result_panel.open_folder_button.clicked.connect(self.open_result_folder)
         self.result_panel.reset_button.clicked.connect(self.reset_flow)
+        self.upload_panel.batch_requested.connect(self.start_batch)
+        self.batch_result_panel.reset_button.clicked.connect(self.reset_flow)
+        self.batch_result_panel.open_folder_button.clicked.connect(self.open_batch_output_folder)
 
         self._apply_styles()
         self._build_menu_bar()
@@ -86,6 +95,11 @@ class MainWindow(QMainWindow):
         self._recent_menu = QMenu("Open &Recent", self)
         self._recent_menu.aboutToShow.connect(self._populate_recent_menu)
         file_menu.addMenu(self._recent_menu)
+
+        open_folder_action = QAction('Open &Folder...', self)
+        open_folder_action.setShortcut('Ctrl+Shift+O')
+        open_folder_action.triggered.connect(self.choose_folder)
+        file_menu.insertAction(self._recent_menu.menuAction(), open_folder_action)
 
         file_menu.addSeparator()
 
@@ -130,6 +144,81 @@ class MainWindow(QMainWindow):
         )
         if filename:
             self.load_pdf(filename)
+
+    def choose_folder(self) -> None:
+        """Open the native folder picker and switch UploadPanel to batch mode."""
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            'Choose Input Folder',
+            self.app_settings.last_open_dir(),
+        )
+        if folder:
+            self.upload_panel.set_batch_input_folder(folder)
+            self.stack.setCurrentWidget(self.upload_panel)
+
+    def start_batch(self, input_folder: Path, output_folder: Path) -> None:
+        """Scan the folder and launch a batch redaction worker."""
+        options = self.upload_panel.collect_options()
+
+        try:
+            request_template = self.workflow.build_request(
+                input_path=input_folder,  # placeholder; replaced per file in worker
+                names=self.workflow.parse_multivalue_text(options['names']),
+                addresses=self.workflow.parse_multivalue_text(options['addresses']),
+                tins=self.workflow.parse_multivalue_text(options['tins']),
+                custom_strings=self.workflow.parse_multivalue_text(options['custom_strings']),
+                detect_tin=bool(options['detect_tin']),
+                detect_phone=bool(options['detect_phone']),
+                detect_email=bool(options['detect_email']),
+                case_sensitive=bool(options['case_sensitive']),
+            )
+        except ValueError as exc:
+            self._show_error(str(exc))
+            return
+
+        items = self.folder_scan_service.scan(input_folder, output_folder)
+        if not items:
+            self._show_error(
+                'No PDF files found in the selected folder.\n'
+                '(Files already named "*redacted*" are skipped.)'
+            )
+            return
+
+        dialog = BatchProgressDialog(total=len(items), parent=self)
+        worker = BatchFolderWorker(
+            engine=self.engine,
+            items=items,
+            request_template=request_template,
+            input_folder=input_folder,
+        )
+        worker.signals.file_started.connect(dialog.update_progress)
+        worker.signals.all_done.connect(
+            lambda results: self._handle_batch_complete(results, input_folder, output_folder, dialog)
+        )
+        worker.signals.failed.connect(
+            lambda msg: (dialog.close(), dialog.deleteLater(), self._show_error(msg))
+        )
+        dialog.show()
+        self.thread_pool.start(worker)
+
+    def _handle_batch_complete(
+        self,
+        results: list[BatchFileResult],
+        input_folder: Path,
+        output_folder: Path,
+        dialog: BatchProgressDialog,
+    ) -> None:
+        dialog.complete()
+        dialog.close()
+        dialog.deleteLater()
+        self.batch_result_panel.load_results(results, input_folder, output_folder)
+        self.stack.setCurrentWidget(self.batch_result_panel)
+
+    def open_batch_output_folder(self) -> None:
+        """Open the batch output folder in Finder/Explorer."""
+        folder = self.batch_result_panel.output_folder()
+        if folder and folder.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def load_pdf(self, file_path: str) -> None:
         """Validate and store a chosen PDF file."""
