@@ -16,11 +16,18 @@ def main() -> int:
             'Install desktop dependencies first.'
         ) from exc
 
+    from PySide6.QtCore import Qt
     from app.ui.main_window import MainWindow
 
     app = QApplication(sys.argv)
     app.setApplicationName('Tax PDF Redactor')
     app.setOrganizationName('Tax Helper')
+
+    # Force light color scheme so Night Shift / system dark mode do not alter UI colors.
+    try:
+        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    except AttributeError:
+        pass
 
     window = MainWindow()
     window.show()
