@@ -14,7 +14,10 @@ class FolderScanService:
         """Return sorted BatchFileItems for all non-redacted PDFs under input_folder."""
 
         items: list[BatchFileItem] = []
-        for pdf_path in sorted(input_folder.rglob('*.pdf')):
+        all_files = sorted(
+            p for p in input_folder.rglob('*') if p.suffix.lower() == '.pdf'
+        )
+        for pdf_path in all_files:
             if 'redacted' in pdf_path.stem.lower():
                 continue
             relative = pdf_path.relative_to(input_folder)
