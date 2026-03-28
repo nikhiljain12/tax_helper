@@ -386,6 +386,9 @@ class MainWindow(QMainWindow):
             QMainWindow {
                 background: #f5f1e8;
             }
+            QLabel {
+                color: #1f2933;
+            }
             QLabel#screenTitle {
                 color: #1d3557;
                 font-size: 28px;
@@ -433,6 +436,45 @@ class MainWindow(QMainWindow):
             }
             QPushButton#primaryButton:hover {
                 background: #34675c;
+            }
+            QPushButton#modeButtonLeft {
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                border-top-right-radius: 0;
+                border-bottom-right-radius: 0;
+                border-right: none;
+                background: #e8e0d0;
+                color: #4a4540;
+                font-weight: 500;
+                min-height: 34px;
+                padding: 0 20px;
+            }
+            QPushButton#modeButtonLeft:checked {
+                background: #254441;
+                color: #ffffff;
+                font-weight: 600;
+            }
+            QPushButton#modeButtonLeft:hover:!checked {
+                background: #ddd4c0;
+            }
+            QPushButton#modeButtonRight {
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
+                background: #e8e0d0;
+                color: #4a4540;
+                font-weight: 500;
+                min-height: 34px;
+                padding: 0 20px;
+            }
+            QPushButton#modeButtonRight:checked {
+                background: #254441;
+                color: #ffffff;
+                font-weight: 600;
+            }
+            QPushButton#modeButtonRight:hover:!checked {
+                background: #ddd4c0;
             }
             QPlainTextEdit, QTreeWidget {
                 background: #fffdf8;
