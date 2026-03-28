@@ -11,10 +11,6 @@ PATTERN_DEFINITIONS: dict[str, tuple[RedactionCategory, re.Pattern[str]]] = {
         RedactionCategory.TIN,
         re.compile(r'(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)'),
     ),
-    'ssn_plain': (
-        RedactionCategory.TIN,
-        re.compile(r'(?<!\d)\d{9}(?!\d)'),
-    ),
     'ssn_partial_x': (
         RedactionCategory.TIN,
         re.compile(r'(?<!\w)[xX]{3}-[xX]{2}-\d{4}(?!\d)'),
@@ -26,10 +22,6 @@ PATTERN_DEFINITIONS: dict[str, tuple[RedactionCategory, re.Pattern[str]]] = {
     'ein_dashed': (
         RedactionCategory.TIN,
         re.compile(r'(?<!\d)\d{2}-\d{7}(?!\d)'),
-    ),
-    'ein_plain': (
-        RedactionCategory.TIN,
-        re.compile(r'(?<!\d)\d{9}(?!\d)'),
     ),
     'phone': (
         RedactionCategory.PHONE,
