@@ -83,11 +83,12 @@ def generate(start: date, end: date, total_hours: float) -> list[tuple[date, flo
         if n == 1:
             k = random.choices([0, 1], weights=[15, 85])[0]
         elif n == 2:
-            k = random.choices([0, 1, 2], weights=[15, 50, 35])[0]
+            k = random.choices([0, 1, 2], weights=[15, 25, 60])[0]
         elif n == 3:
-            k = random.choices([0, 1, 2, 3], weights=[15, 40, 35, 10])[0]
-        else:  # long weekend
-            k = min(random.choices([0, 1, 2, 3, 4], weights=[10, 25, 35, 20, 10])[0], n)
+            # Prefer 2 days; rarely 1 or all 3; sometimes skip entirely
+            k = random.choices([0, 1, 2, 3], weights=[15, 10, 65, 10])[0]
+        else:  # long weekend (4+ days)
+            k = min(random.choices([0, 1, 2, 3, 4], weights=[10, 10, 40, 30, 10])[0], n)
         if k:
             work_days.update(random.sample(block, k))
 
