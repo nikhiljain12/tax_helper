@@ -9,6 +9,7 @@ description = "Local-first PDF redaction for tax and other sensitive documents"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "holidays>=0.96",
     "PyMuPDF==1.26.7",
     "PySide6>=6.8,<7",
 ]
