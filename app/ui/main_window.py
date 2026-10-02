@@ -5,9 +5,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QThreadPool, QUrl
+from PySide6.QtCore import Qt, QThreadPool, QUrl
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QMainWindow,
     QMenu,
@@ -22,6 +23,7 @@ from app.services.file_service import FileService
 from app.services.folder_scan_service import FolderScanService
 from app.services.redaction_workflow import RedactionWorkflowService
 from app.ui.batch_progress_dialog import BatchProgressDialog
+from app.ui.folder_selection_dialog import FolderSelectionDialog
 from app.ui.batch_result_panel import BatchResultPanel
 from app.ui.progress_dialog import BusyProgressDialog
 from app.ui.result_panel import ResultPanel
@@ -46,6 +48,7 @@ class MainWindow(QMainWindow):
         self.current_analysis: DocumentAnalysis | None = None
         self.current_result: RedactionResult | None = None
         self.progress_dialog: BusyProgressDialog | None = None
+        self._batch_worker: BatchFolderWorker | None = None
 
         self.setWindowTitle('Tax PDF Redactor')
         self.resize(1100, 780)
@@ -184,6 +187,11 @@ class MainWindow(QMainWindow):
             )
             return
 
+        sel_dialog = FolderSelectionDialog(items, input_folder, parent=self)
+        if sel_dialog.exec() != QDialog.Accepted:
+            return
+        items = sel_dialog.accepted_items()
+
         dialog = BatchProgressDialog(total=len(items), parent=self)
         worker = BatchFolderWorker(
             engine=self.engine,
@@ -191,13 +199,20 @@ class MainWindow(QMainWindow):
             request_template=request_template,
             input_folder=input_folder,
         )
-        worker.signals.file_started.connect(dialog.update_progress)
-        worker.signals.all_done.connect(
-            lambda results: self._handle_batch_complete(results, input_folder, output_folder, dialog)
-        )
-        worker.signals.failed.connect(
-            lambda msg: (dialog.close(), dialog.deleteLater(), self._show_error(msg))
-        )
+        def _on_done(results: list) -> None:
+            self._batch_worker = None
+            self._handle_batch_complete(results, input_folder, output_folder, dialog)
+
+        def _on_failed(msg: str) -> None:
+            self._batch_worker = None
+            dialog.close()
+            dialog.deleteLater()
+            self._show_error(msg)
+
+        worker.signals.file_started.connect(dialog.update_progress, Qt.ConnectionType.QueuedConnection)
+        worker.signals.all_done.connect(_on_done, Qt.ConnectionType.QueuedConnection)
+        worker.signals.failed.connect(_on_failed, Qt.ConnectionType.QueuedConnection)
+        self._batch_worker = worker  # keep Python ref alive while worker thread runs
         dialog.show()
         self.thread_pool.start(worker)
 
@@ -485,6 +500,34 @@ class MainWindow(QMainWindow):
             QCheckBox {
                 color: #1f2933;
                 spacing: 8px;
+            }
+            QWidget#folderRow {
+                background: #fffdf8;
+                border-bottom: 1px solid #ece4d4;
+            }
+            QWidget#folderRow:last-child {
+                border-bottom: none;
+            }
+            QScrollArea#folderScroll {
+                border: 1px solid #d9c6a5;
+                border-radius: 10px;
+                background: #fffdf8;
+            }
+            QLabel#fileCount {
+                color: #888;
+                font-size: 12px;
+            }
+            QPushButton#linkButton {
+                background: transparent;
+                border: none;
+                color: #254441;
+                text-decoration: underline;
+                min-height: 24px;
+                padding: 0 4px;
+                font-size: 12px;
+            }
+            QPushButton#linkButton:hover {
+                color: #34675c;
             }
             '''
         )
